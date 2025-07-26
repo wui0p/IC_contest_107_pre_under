@@ -1,0 +1,584 @@
+
+
+
+
+
+
+////=============================================================
+////	WIRE / REG / INT
+////=============================================================
+
+//	reg [19:0] raw_image[0:4355];
+//	reg [19:0] L0_image[0:4095];
+//	reg [19:0] max [0:1];
+//	integer i, addr, fill;
+
+//	reg [2:0] state, next_state;
+//	parameter IDLE = 0, ZERO_PAD = 1, CONVOL = 2, WRITE_P0 = 3, WRITE_P1 = 4, FIN = 5;
+
+//	reg [19:0] kernel [0:8];
+//	reg [19:0] bias = 20'h01310;
+//	initial begin
+//		kernel[0] = 20'h0A89E;
+//		kernel[1] = 20'h092D5;
+//		kernel[2] = 20'h06D43;
+//		kernel[3] = 20'h01004;
+//		kernel[4] = 20'hF8F71;
+//		kernel[5] = 20'hF6E54;
+//		kernel[6] = 20'hFA6D7;
+//		kernel[7] = 20'hFC834;
+//		kernel[8] = 20'hFAC19;
+//	end
+
+//	reg busy_reg;
+//	reg [11:0] iaddr_reg;
+//	reg cwr_reg;
+//	reg [11:0] caddr_wr_reg;
+//	reg [19:0] cdata_wr_reg;
+//	reg [2:0] csel_reg;
+	
+////=============================================================
+////	FSM (NEXT_STATE)
+////=============================================================
+
+//	always @(posedge clk, posedge reset) begin
+//		if(reset) state = IDLE;
+//		else state = next_state;
+//	end
+
+//	always @(*) begin
+//		case(state)
+//			IDLE: next_state = (ready && !reset)? ZERO_PAD : IDLE;
+//			ZERO_PAD: next_state = (addr >= 4095)? CONVOL : ZERO_PAD; 
+//			CONVOL: next_state = WRITE_P0;
+//			WRITE_P0: next_state = (addr >= 4095)? WRITE_P1 : WRITE_P0;
+//			WRITE_P1: next_state = (addr >= 1023)? FIN : WRITE_P1;
+//			FIN: next_state = FIN;
+//		endcase
+//	end
+
+////=============================================================
+////	FSM
+////=============================================================
+
+//	always @(posedge clk) begin
+//		case(state)
+//			IDLE: begin
+//				if(reset) begin
+//					busy_reg = 0;
+//					fill = 66;
+//					addr = 0;
+//					csel_reg = 3'b000;
+//					for(i=0; i<=4355; i=i+1) raw_image[i] = 0;
+//				end
+//			end
+//			ZERO_PAD: begin
+//				busy_reg = 1;
+//				iaddr_reg = addr;
+//			end
+//			CONVOL: begin
+//				i = 0;
+//				for(addr=0; addr<=4095; addr=addr+1) begin
+//					L0_image[addr] = (raw_image[i]*kernel[0] + raw_image[i+1]*kernel[1] + raw_image[i+2]*kernel[2]
+// 									+ raw_image[i+66]*kernel[3] + raw_image[i+67]*kernel[4] + raw_image[i+68]*kernel[5]
+// 									+ raw_image[i+132]*kernel[6] + raw_image[i+133]*kernel[7] + raw_image[i+134]*kernel[8]) + bias;
+//					if(L0_image[addr][19]) L0_image[addr] = 0;
+//					if((addr+1) % 64 == 0 && addr > 0) i = i + 3;
+//					else i = i + 1;
+//				end
+//				addr = 0;
+//			end
+//			WRITE_P0: begin
+//				i = 0;
+//				csel_reg = 3'b001;
+//				cwr_reg = 1;
+//				caddr_wr_reg = addr;
+//				cdata_wr_reg = L0_image[addr];
+//				if(addr == 4095) addr = 0;
+//				else addr = addr + 1;
+//			end
+//			WRITE_P1: begin
+//				csel_reg = 3'b011;
+//				caddr_wr_reg = addr;
+//				max[0] = (L0_image[i] > L0_image[i+1])? L0_image[i] : L0_image[i+1];
+//				max[1] = (L0_image[i+64] > L0_image[i+65])? L0_image[i+64] : L0_image[i+65];
+//				cdata_wr_reg = (max[0] > max[1])? max[0] : max[1];
+//				addr = addr + 1;
+//				if(addr % 32 == 0 && addr > 0) i = i + 66;
+//				else i = i + 2;
+//			end
+//			FIN: busy_reg = 0;
+//		endcase
+//	end
+
+//	always @(negedge clk) begin
+//		case(state)
+//			ZERO_PAD: begin
+//				if(addr % 64 == 0 && addr > 0) fill = fill + 3;
+//				fill = fill + 1;
+//				raw_image[fill] = idata;
+//				addr = addr + 1;
+//			end
+//		endcase
+//	end
+
+////=============================================================
+////	ASSIGN
+////=============================================================
+
+//	assign busy = busy_reg;
+//	assign iaddr = iaddr_reg;
+//	assign cwr = cwr_reg;
+//	assign caddr_wr = caddr_wr_reg;
+//	assign cdata_wr = cdata_wr_reg;
+//	assign csel = csel_reg;
+
+
+
+//  //=============================================================
+//  //	WIRE / REG / INT
+//  //=============================================================
+
+//  	//reg version of output
+//  	reg busy_reg;
+//  	reg [11:0] iaddr_reg;
+//  	reg cwr_reg;
+//  	reg [11:0] caddr_wr_reg;
+//  	reg [19:0] cdata_wr_reg;
+//  	reg [2:0] csel_reg;
+
+//  	reg [19:0] raw_image [0:4355];
+//  	reg	[19:0] L0_image [0:4095];
+//  	reg	[19:0] L1_image [0:1023];
+//  	reg [19:0] L1_dec1, L1_dec2, L1_max;
+//  	integer i, fill, p0, p1;
+
+//  	reg flag_L0;
+//  	reg flag_write;
+
+//  	reg [19:0] kernel [0:8];
+//  	reg [19:0] bias = 20'h01310;
+//  	initial begin
+//  		kernel[0] = 20'h0A89E;
+//  		kernel[1] = 20'h092D5;
+//  		kernel[2] = 20'h06D43;
+//  		kernel[3] = 20'h01004;
+//  		kernel[4] = 20'hF8F71;
+//  		kernel[5] = 20'hF6E54;
+//  		kernel[6] = 20'hFA6D7;
+//  		kernel[7] = 20'hFC834;
+//  		kernel[8] = 20'hFAC19;
+//  	end
+
+//  //=============================================================
+//  //	INPUT IMAGE & ZERO-PADDING
+//  //=============================================================
+//  //implment the image from testfixture to 'raw_image'
+//  //set 'raw_image' with zero-padding
+
+//  	always @(posedge clk) begin
+//  		if(reset) begin
+//  			busy_reg = 0;
+//  			iaddr_reg = 0;
+//  			fill = 66;
+//  			csel_reg = 1'b000;
+//  			for(i=0; i<=4355; i=i+1) begin
+//  				raw_image[i] = 0;
+//  			end
+//  		end else begin
+//  			if(ready) busy_reg = 1;
+//  			if(busy_reg && iaddr_reg < 4095) iaddr_reg = iaddr_reg + 1;
+//  			else if(iaddr_reg == 4095 && !flag_L0 && !flag_write) flag_L0 = 1;
+//  		end
+//  	end
+
+//  	always @(negedge clk) begin
+//  		if(busy_reg && iaddr_reg <= 4095 && !flag_L0 && !flag_write) begin
+//  			if(iaddr_reg % 64 == 0 && iaddr_reg > 0) fill = fill + 3;
+//  			else fill = fill + 1;
+//  			raw_image[fill] = idata;
+//  		end
+//  	end
+
+//  //=============================================================
+//  //	CONVOLUTIONAL & ReLU & MAX-POOLING
+//  //=============================================================
+
+//  	always @(posedge clk) begin
+//  		if(flag_L0) begin
+//  			fill = 66;
+//  			i = 0;
+//  			for(p0=0; p0<=4095; p0=p0+1) begin
+//  				L0_image[p0] = 	(raw_image[i]*kernel[0] + raw_image[i+1]*kernel[1] + raw_image[i+2]*kernel[2]
+//  								+ raw_image[i+66]*kernel[3] + raw_image[i+67]*kernel[4] + raw_image[i+68]*kernel[5]
+//  								+ raw_image[i+132]*kernel[6] + raw_image[i+133]*kernel[7] + raw_image[i+134]*kernel[8]) + bias;
+//  				if(L0_image[p0][19]) L0_image[p0] = 0;
+//  				if((p0+1) % 64 == 0 && p0 > 0) i = i + 3;
+//  				else i = i + 1;
+//  			end
+//  			i = 0;
+//  			for(p1=0; p1<1023; p1=p1+1) begin
+//  				L1_dec1 = (L0_image[i] > L0_image[i+1])? L0_image[i] : L0_image[i+1];
+//  				L1_dec2 = (L0_image[i+64] > L0_image[i+65])? L0_image[i+64] : L0_image[i+65];
+//  				L1_image[p1] = (L1_dec1 > L1_dec2)? L1_dec1 : L1_dec2;
+//  				if((p1+1) % 32 == 0 && p1 > 0) i = i + 66;
+//  				else i = i + 2;
+//  			end
+//  			flag_L0 = 0;
+//  			flag_write = 1;
+//  		end
+//  	end
+
+//  //=============================================================
+//  //	WRITE
+//  //=============================================================
+
+//  	always @(posedge clk) begin
+//  		if(flag_write) begin
+//  			cwr_reg = 1;
+//  			csel_reg = 3'b001;
+//  			for(p0=0; p0<4095; p0=p0+1) begin
+//  				caddr_wr_reg = p0;
+//  				cdata_wr_reg = L0_image[p0];
+//  			end
+//  			csel_reg = 3'b011;
+//  			for(p1=0; p1<1023; p1=p1+1) begin
+//  				caddr_wr_reg = p1;
+//  				cdata_wr_reg = L1_image[p1];
+//  			end
+//  			csel_reg = 1'b000;
+//  			flag_write = 0;
+//  		end
+//  	end
+
+//  //=============================================================
+//  //	ASSIGN OUTPUT
+//  //=============================================================
+
+//  	//assign reg version of output to wire output
+//  	assign busy = busy_reg;
+//  	assign iaddr = iaddr_reg;
+//  	assign cwr = cwr_reg;
+//  	assign caddr_wr = caddr_wr_reg;
+//  	assign cdata_wr = cdata_wr_reg; 
+//  	assign csel = csel_reg;
+
+
+
+// //=============================================================
+// //	SET VALUES
+// //=============================================================
+
+// 	reg [19:0] raw_image [0:4355];
+// 	reg [19:0] max [0:3];
+// 	integer i, fill, addr;
+
+// 	reg [2:0] state, next_state;
+// 	parameter IDLE = 0, ZERO_PAD = 1, BUFF1 = 2, CONVOL = 3, BUFF2 = 4, MAX_POOL = 5, FIN = 6;
+// 	reg flag_new;
+
+// 	reg [19:0] kernel [0:8];
+// 	reg [19:0] bias = 20'h01310;
+// 	initial begin
+// 		kernel[0] = 20'h0A89E;
+// 		kernel[1] = 20'h092D5;
+// 		kernel[2] = 20'h06D43;
+// 		kernel[3] = 20'h01004;
+// 		kernel[4] = 20'hF8F71;
+// 		kernel[5] = 20'hF6E54;
+// 		kernel[6] = 20'hFA6D7;
+// 		kernel[7] = 20'hFC834;
+// 		kernel[8] = 20'hFAC19;
+// 	end
+
+// 	reg busy_reg;
+// 	reg [11:0] iaddr_reg;
+// 	reg cwr_reg;
+// 	reg [11:0] caddr_wr_reg;
+// 	reg [19:0] cdata_wr_reg;
+// 	reg crd_reg;
+// 	reg [11:0] caddr_rd_reg;
+// 	reg [2:0] csel_reg;
+
+// //=============================================================
+// //	FSM (NEXT_STATE)
+// //=============================================================
+
+// 	always @(posedge clk, posedge reset) begin
+// 		if(reset) state = IDLE;
+// 		else state = next_state;
+// 	end
+
+// 	always @(*) begin
+// 		case(state) 
+// 			//---------------------------------
+// 			IDLE: begin
+// 				if(!reset && ready) next_state = ZERO_PAD;
+// 				else next_state = IDLE;
+// 			end
+// 			//---------------------------------
+// 			ZERO_PAD: begin
+// 				if(iaddr_reg == 4095) next_state = BUFF1;
+// 				else next_state = ZERO_PAD;
+// 			end
+// 			//---------------------------------
+// 			BUFF1: next_state = CONVOL;
+// 			//---------------------------------
+// 			CONVOL: begin
+// 				if(caddr_wr_reg == 4095) next_state = BUFF2;
+// 				else next_state = CONVOL;
+// 			end
+// 			//---------------------------------
+// 			BUFF2: next_state = MAX_POOL;
+// 			//---------------------------------
+// 			MAX_POOL: begin
+// 				if(caddr_wr_reg == 1023) next_state = FIN;
+// 				else next_state = MAX_POOL;
+// 			end
+// 			//---------------------------------
+// 			FIN: begin
+// 				if(reset) next_state = IDLE;
+// 				else next_state = FIN;
+// 			end
+// 			//---------------------------------
+// 		endcase
+// 	end
+
+// //=============================================================
+// //	FSM (STATE)
+// //=============================================================
+
+// 	always @(clk) begin
+// 		case(state)
+// 			//---------------------------------
+// 			IDLE: begin
+// 				if(reset) begin
+// 					for(i=0; i<=4355; i=i+1) raw_image[i] = 0;
+// 					busy_reg = 0;
+// 					iaddr_reg = 0;
+// 					caddr_wr_reg = 0;
+// 					fill = 66;
+// 					addr = 0;
+// 				end
+// 				flag_new = 1;
+// 			end
+// 			//---------------------------------
+// 			ZERO_PAD: begin
+// 				if(clk && !flag_new) iaddr_reg = iaddr_reg + 1;
+// 				if(!clk) begin
+// 					if(iaddr_reg % 64 == 0 && iaddr_reg > 0) fill = fill + 3;
+// 					else fill = fill + 1;
+// 					raw_image[fill] = idata;
+// 				end
+// 				if(flag_new) begin
+// 					busy_reg = 1;
+// 					flag_new = 0;
+// 					i = 0;
+// 				end
+// 			end
+// 			//---------------------------------
+// 			BUFF1: begin
+// 				fill = 0;
+// 				caddr_wr_reg = 0;
+// 			end
+// 			//---------------------------------
+// 			CONVOL: begin
+// 				cwr_reg = 1;
+// 				csel_reg = 3'b001;
+// 				if(clk) begin
+// 					caddr_wr_reg = addr;
+// 					cdata_wr_reg =  (raw_image[i]*kernel[0] + raw_image[i+1]*kernel[1] + raw_image[i+2]*kernel[2]
+// 									+ raw_image[i+66]*kernel[3] + raw_image[i+67]*kernel[4] + raw_image[i+68]*kernel[5]
+// 									+ raw_image[i+132]*kernel[6] + raw_image[i+133]*kernel[7] + raw_image[i+134]*kernel[8]) + bias;
+// 					if(addr < 0) addr = 0;
+// 					if((addr+1) % 64 == 0 && addr > 0) i = i + 3;
+// 					else i = i + 1;
+// 					addr = addr + 1;
+// 				end
+// 			end
+// 			//---------------------------------
+// 			BUFF2: begin
+// 				cwr_reg = 0;
+// 				i = 0;
+// 				addr = 0;
+// 				caddr_wr_reg = 0;
+// 				cdata_wr_reg = 0;
+// 				caddr_rd_reg = 0;
+// 			end
+// 			//---------------------------------
+// 			MAX_POOL: begin
+// 				if(clk) begin
+// 					if(i == 0) begin
+// 						csel_reg = 3'b001;
+// 						cwr_reg = 0;
+// 						crd_reg = 1;
+// 						caddr_rd_reg = fill;
+// 					end else if(i == 1) caddr_rd_reg = fill + 1;
+// 					else if(i == 2) caddr_rd_reg = fill + 64;
+// 					else if(i == 3) caddr_rd_reg = fill + 65;
+// 					else begin
+// 						csel_reg = 3'b011;
+// 						cwr_reg = 1;
+// 						crd_reg = 0;
+// 						if((addr+1) % 32 == 0 && addr > 0) fill = fill + 66;
+// 						else fill = fill + 2;
+// 						caddr_wr_reg = addr;
+// 						cdata_wr_reg =  ((max[0] > max[1] ? max[0] : max[1]) > (max[2] > max[3] ? max[2] : max[3])) ? 
+//              							(max[0] > max[1] ? max[0] : max[1]) : 
+//              							(max[2] > max[3] ? max[2] : max[3]);
+// 						i = 0;
+// 						addr = addr + 1;
+// 					end
+// 				end
+// 				if(!clk) begin
+// 					if(i<4) begin
+// 						max[i] = cdata_rd;
+// 						i = i + 1;
+// 					end
+// 				end
+// 			end
+// 			//---------------------------------
+// 		endcase
+// 	end
+
+// //=============================================================
+// //	ASSIGN OUTPUT
+// //=============================================================
+
+// 	assign busy = busy_reg;
+// 	assign iaddr = iaddr_reg;
+// 	assign cwr = cwr_reg;
+// 	assign caddr_wr = caddr_wr_reg;
+// 	assign cdata_wr = cdata_wr_reg;
+// 	assign crd = crd_reg;
+// 	assign caddr_rd = caddr_rd_reg;
+// 	assign csel = csel_reg;
+
+//=============================================================
+//	WIRE / REG / INT
+//=============================================================
+
+	reg [19:0] max [0:1];
+	integer i, addr, fill;
+
+	reg [2:0] state, next_state;
+	parameter IDLE = 0, ZERO_PAD = 1, WRITE_P0 = 2, WRITE_P1 = 3, FIN = 4;
+
+	reg [19:0] kernel [0:8];
+	reg [19:0] bias = 20'h01310;
+	initial begin
+		kernel[0] = 20'h0A89E;
+		kernel[1] = 20'h092D5;
+		kernel[2] = 20'h06D43;
+		kernel[3] = 20'h01004;
+		kernel[4] = 20'hF8F71;
+		kernel[5] = 20'hF6E54;
+		kernel[6] = 20'hFA6D7;
+		kernel[7] = 20'hFC834;
+		kernel[8] = 20'hFAC19;
+	end
+
+	reg busy_reg;
+	reg [11:0] iaddr_reg;
+	reg cwr_reg;
+	reg [11:0] caddr_wr_reg;
+	reg [19:0] cdata_wr_reg;
+	reg [2:0] csel_reg;
+
+//=============================================================
+//	FSM (NEXT_STATE)
+//=============================================================
+
+	always @(posedge clk, posedge reset) begin
+		if(reset) state = IDLE;
+		else state = next_state;
+	end
+
+	always @(*) begin
+		case(state)
+			IDLE: next_state = (addr == 4355)? ZERO_PAD : IDLE;
+			ZERO_PAD: next_state = (addr == 4095)? WRITE_P0 : ZERO_PAD;
+			WRITE_P0: next_state = (addr == 4095)? WRITE_P1 : WRITE_P0;
+			WRITE_P1: next_state = (addr == 1023)? FIN : WRITE_P1;
+			FIN: next_state = FIN;
+		endcase
+	end
+
+//=============================================================
+//	FSM (STATE)
+//=============================================================
+
+	always @(posedge clk) begin
+		case(state)
+			IDLE: begin
+				if(!reset) begin
+					raw_image[addr] = 0;
+					if(addr == 4355) addr = 0;
+					else addr = addr + 1;
+				end else begin
+					addr = 0;
+					i = 0;
+					fill = 66;
+					csel_reg = 3'b000;
+				end
+			end
+			ZERO_PAD: begin
+				busy_reg = 1;
+				iaddr_reg = addr;
+			end
+			WRITE_P0: begin
+				csel_reg = 3'b001;
+				L0_image[addr] = (raw_image[i]*kernel[0] + raw_image[i+1]*kernel[1] + raw_image[i+2]*kernel[2]
+ 								+ raw_image[i+66]*kernel[3] + raw_image[i+67]*kernel[4] + raw_image[i+68]*kernel[5]
+ 								+ raw_image[i+132]*kernel[6] + raw_image[i+133]*kernel[7] + raw_image[i+134]*kernel[8]) + bias;
+				caddr_wr_reg = addr;
+				cdata_wr_reg = L0_image[addr];
+				if(addr == 4095) begin
+					addr = 0;
+					i = 0;
+				end else begin 
+					addr = addr + 1;
+					if(addr % 64 == 0 && addr > 0) i = i + 3;
+					else i = i + 1;
+				end
+			end
+			WRITE_P1: begin
+				csel_reg = 3'b011;
+				caddr_wr_reg = addr;
+				max[0] = (L0_image[i] > L0_image[i+1])? L0_image[i] : L0_image[i+1]; 
+				max[1] = (L0_image[i+64] > L0_image[i+65])? L0_image[i+64] : L0_image[i+65];
+				cdata_wr_reg = (max[0] > max[1])? max[0] : max[1];
+				if(addr == 1023) addr = 0;
+				else addr = addr + 1;
+			end
+			FIN: busy_reg = 1;
+		endcase
+	end
+
+	always @(negedge clk) begin
+		case(state)
+			ZERO_PAD: begin
+				if(addr % 64 == 0 && addr > 0) fill = fill + 3;
+				else fill = fill + 1;
+				raw_image[fill] = idata;
+				if(addr == 4095) begin
+					addr = 0;
+					fill = 66;
+				end else addr = addr + 1;
+			end
+		endcase
+	end
+
+//=============================================================
+//	ASSIGN
+//=============================================================
+
+	assign busy = busy_reg;
+	assign iaddr = iaddr_reg;
+	assign cwr = cwr_reg;
+	assign caddr_wr = caddr_wr_reg;
+	assign cdata_wr = cdata_wr_reg;
+	assign csel = csel_reg;
+
+
+
