@@ -1,9 +1,9 @@
-# 🧠 ICCAD 2019 Taiwan — Image Convolutional Circuit (CONV.v)
+# 🧠 ICCAD 2019 Taiwan — Image Convolutional Circuit
 
 This is my attempt at solving the **2019 Taiwan IC Design Contest** undergraduate-level problem:  
 **Cell-Based Digital Circuit Design – Image Convolutional Circuit (CONV).**
 
-The project was based on the official contest problem : https://drive.google.com/drive/folders/1SLUKpYJWn8X3FaiH7jsgb2EB31Y5AGsV.
+The project was based on the official contest problem: https://drive.google.com/drive/folders/1SLUKpYJWn8X3FaiH7jsgb2EB31Y5AGsV.
 
 > ⚠️ **Note:** I'm still working on it, and it's not fully complete or verified yet. I'm using this repo to track my progress and learn as I go.
 
